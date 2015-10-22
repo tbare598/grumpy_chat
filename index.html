@@ -1,0 +1,309 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; width: 100%; }
+      form input { border: 0; padding: 10px; width: 80%; margin-right: .5%; }
+      form button { width: 19%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      img { max-width:100%; max-height:100%; }
+      #txtUserName { padding: 3px; width: 100%; padding: 10px; margin-right: .5%; }
+      #divChat { overflow-y: scroll; width:500px; height:400px;}
+      #divUserList { overflow-y: scroll; width:200px; height:400px;}
+      #userList { list-style-type: none; margin: 0; padding: 0; }
+      #userList li { padding: 5px 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+      #tdChkNotification { vertical-align: top; }
+    </style>
+  </head>
+    <body>
+        <table>
+            <tbody>
+                <tr>
+                    <td>
+                        <div id="divChat">
+                            <ul id="messages"></ul>
+                        </div>
+                    </td>
+                    <td>
+                        <div id="divUserList">
+                            <ul id="userList"></ul>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <form id="frmChatSend" action="">
+                            <input id="txtMsg" autocomplete="off" /><button>Send</button>
+                        </form>
+                            <input id="txtUserName" autocomplete="off" placeholder="Type User Name In Here First" />
+                    </td>
+                    <td id="tdChkNotification">
+                        Notifications:</br>
+                        <div title="Notifications">
+                            <input type="checkbox" 
+                                   id="chkAlerts" 
+                                   name="alerts" 
+                                   value="alerts"> Alerts
+                            <input type="checkbox" 
+                                   id="chkSounds" 
+                                   name="sounds" 
+                                   value="sounds"> Sounds
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+        <script>
+            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            function formatTimestamp(time){
+              var formatted = '';
+              
+              formatted += months[time.getMonth()] + '-' + time.getDate();
+              
+              formatted += '  '
+              
+              var hours = time.getHours();
+              var mins = time.getMinutes();
+              if(hours < 10) hours = '0' + hours;
+              if(mins < 10) mins = '0' + mins;
+              
+              formatted += hours + ':' + mins;
+              
+              return formatted;
+            }
+            
+            function pl(msg) {
+                console.log('DEBUG->' + msg);
+            };
+          $(document).ready(function() {
+              var socket = io();
+              var linkRegEx = /(https?:\/\/[^"\s<>]+)(\s|$)/g
+              var winFocus = false;
+              var stopAlerts = false;
+            
+              function formatMessage(msg,callback){
+                var newMsg = msg;
+                var links = newMsg.match(linkRegEx);
+                var callbackCount = 0;
+                if(links){
+                  links.forEach(function(link){
+                    isUrlAnImage(link, function(isValid){
+                      if(isValid){
+                        newMsg = newMsg.replace(link, '<img src="'+link+'" alt="imgRegEx">');
+                      }else{
+                        newMsg = newMsg.replace(link, '<a href="'+link+'" target="_blank">'+link+'</a>');
+                      }
+                      callbackCount++;
+                      //If we got all the callbacks returned, then callback
+                      if(callbackCount == links.length){
+                        callback(newMsg);
+                      }
+                    });
+                  });
+                }else{
+                  callback(newMsg);
+                }
+              }
+              
+              function isUrlAnImage(url, callback){
+                var img = new Image();
+                img.onerror = function() { callback(false); }
+                img.onload =  function() { callback(true); }
+                img.src = url
+              }
+              
+              $(window).blur(function(){
+                winFocus = false;
+              });
+              $(window).focus(function(){
+                winGainFocus();
+              });
+              $(window).click(function(){
+                winGainFocus();
+              });
+              
+              function winGainFocus(){
+                winFocus = true;
+                //start alerts because now when the user navigates away, they
+                //will get alerts again
+                startAlerts(true);
+              }
+              
+              //If you pass this false, it will stop extra alerts from appearing
+              function startAlerts(contAlerts){
+                stopAlerts = !contAlerts;
+              }
+              
+              //Updating the alert message to make the page gain focus
+              (function() {
+                  var _old_alert = window.alert;
+                  window.alert = function() {
+                    _old_alert.apply(window,arguments);
+                    winGainFocus();
+                  };
+              })();
+              
+              function doAlert() {
+                  if(!winFocus){
+                      //This is for sound notification
+                      if ($('#chkSounds').is(':checked')){
+                          var audio = new Audio('sounds/notif.wav');
+                          audio.play();
+                          //When audio is done, show alert notification
+                          audio.addEventListener("ended", function(){
+                              audio.currentTime = 0;
+                              
+                              //This is for alert notifications and for title bar flashy text
+                              //We want this after the sound notification finishes, because otherwise 
+                              //the sound will be paused until this alert is clicked away.
+                              if((!stopAlerts) && $('#chkAlerts').is(':checked')){
+                                  //Stop more alerts
+                                  startAlerts(false);
+                                  var oldTitle = document.title;
+                                  var msg = "New Message!";
+                                  var timeoutId;
+                                  var blink = function() { document.title = document.title == msg ? ' ' : msg; };
+                                  var clear = function() {
+                                      clearInterval(timeoutId);
+                                      document.title = oldTitle;
+                                      window.onmousemove = null;
+                                      timeoutId = null;
+                                  };
+                                  
+                                  if (!timeoutId) {
+                                      timeoutId = setInterval(blink, 1000);
+                                      window.onmousemove = clear;
+                                  }
+                                  if ($('#chkAlerts').is(':checked'))
+                                      alert(msg);
+                              }
+                            });
+                      }
+                      
+                  }
+              }
+
+              //TODO: KEEP USERS MESSAGE IN MESSAGE BOX WHEN IF A USERNAME FAILS
+              $('#frmChatSend').submit(function(){
+                  var msg = $('#txtMsg').val();
+                  var userName = $('#txtUserName').val();
+                  
+                  if(userName === ""){
+                      alert('Make a User Name');
+                  }else if($('#liUserNameID'+userName).length && $('#txtUserName').is(":enabled")){
+                      alert('User Name Unavailable, Use Another.');
+                  }else if(msg !== ''){
+                      var msg;
+                      $('#txtMsg').val('');
+                      
+                      //If the user name is enabled, that means they haven't sent a message yet
+                      //In that case disable it and add their username to the message
+                      if($('#txtUserName').is(":enabled")){
+                        msg = { "msg" : userName + ' -> ' + msg,
+                                "userName": userName };
+                        $('#txtUserName').attr("disabled", true);
+                      }else{
+                        msg = { "msg" : userName + ' -> ' + msg };
+                      }
+                      socket.emit('chat message', msg);
+                      pl('sending msg');
+                      //clear text box
+                      msg = '';
+                      return false;
+                  }else{
+                    return false;
+                  }
+              });
+              socket.on('chat message', function(newMsg){
+                var newMsg = newMsg;
+                
+                //Making a list object with HTML safe text
+                newMsg = $('<li>').text(newMsg);
+                //Converting back to text
+                newMsg = newMsg[0].innerHTML;
+                //Adding links/images. When that's done, display it
+                newMsg = formatMessage(newMsg, function(msg){
+                  //Creating an li and adding timestamp and formatted msg
+                  newMsg = "<li title='" + formatTimestamp(new Date()) + "'>" + msg + "</li>";
+                  
+                  $('#messages').append(newMsg);
+                  
+                  var div = $('#divChat');
+                  div.scrollTop(div[0].scrollHeight);
+                  
+                  doAlert();
+                });
+              });
+              
+              socket.on('user list update', function(userNameList){
+                var listOfIds = [];
+                
+                var newList = [];
+                //Append a generic list id name to the front of all of them, so that
+                //a user can't make a username that is the id of another element
+                userNameList.forEach(function(index){
+                  newList.push('liUserNameID' + index);
+                });
+
+                $('#userList').each(function(){
+                    $(this).find('li').each(function(){
+                        var currId = $(this).attr('id');
+                        listOfIds.push(currId);
+                        if(newList.indexOf(currId) === -1) {$(this).remove();}
+                    });
+                });
+
+                newList.forEach(function(id) {
+                  if(listOfIds.indexOf(id) === -1){
+                      var newLi = $('<li>').text(id.substring(12));
+                      newLi.attr('id', id);
+                      $('#userList').append(newLi);
+                  }
+                });
+                
+              });
+              
+              socket.on('bad user name', function(reason){
+                $('#txtUserName').attr("disabled", true);
+                $('#txtMsg').attr("disabled", true);
+                switch(reason){
+                  case 'banned': 
+                    alert('That username has been banned.\nGO AWAY!');
+                    break;
+                  case 'duplicate':
+                    alert('User Name Unavailable, Use Another.');
+                    break;
+                  default:
+                    alert('An Error Occured When Adding That Username.\nTry Again');
+                };
+              });
+              
+              socket.on('request user data', function(){
+                var user = {};
+                if(! $('#txtUserName').is(":enabled")){
+                  user.userName = $('#txtUserName').val();
+                }
+                socket.emit('user name response', user);
+              });
+              
+              socket.on('disconnect reason', function(reason){
+                oldAlertStatus = stopAlerts;
+                startAlerts(true);
+                if(reason){
+                  alert('Disconnected\n\n' + reason);
+                }else{
+                  alert('You have been disconnected');
+                }
+                startAlerts(oldAlertStatus);
+              });
+          });
+        </script>
+    </body>
+</html>
