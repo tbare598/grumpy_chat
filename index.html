@@ -71,10 +71,12 @@
               
               var hours = time.getHours();
               var mins = time.getMinutes();
+              var secs = time.getSeconds();
               if(hours < 10) hours = '0' + hours;
               if(mins < 10) mins = '0' + mins;
+              if(secs < 10) secs = '0' + secs;
               
-              formatted += hours + ':' + mins;
+              formatted += hours + ':' + mins + ':' + secs;
               
               return formatted;
             }
@@ -83,7 +85,10 @@
                 console.log('DEBUG->' + msg);
             };
           $(document).ready(function() {
+              //var url = window.location.href;
+              //var socket = io.connect(url,{reconectionDelay:1000});
               var socket = io();
+              
               var linkRegEx = /(https?:\/\/[^"\s<>]+)(\s|$)/g
               var winFocus = false;
               var stopAlerts = false;
@@ -116,7 +121,7 @@
                 var img = new Image();
                 img.onerror = function() { callback(false); }
                 img.onload =  function() { callback(true); }
-                img.src = url
+                img.src = url;
               }
               
               $(window).blur(function(){
@@ -246,20 +251,23 @@
                 var listOfIds = [];
                 
                 var newList = [];
-                //Append a generic list id name to the front of all of them, so that
+                //Append 'liUserNameID' to the front of all of them, so that
                 //a user can't make a username that is the id of another element
                 userNameList.forEach(function(index){
                   newList.push('liUserNameID' + index);
                 });
 
+                //If the current user list has a name that isn't in the new 
+                //list, remove it
                 $('#userList').each(function(){
                     $(this).find('li').each(function(){
                         var currId = $(this).attr('id');
                         listOfIds.push(currId);
-                        if(newList.indexOf(currId) === -1) {$(this).remove();}
+                        if(newList.indexOf(currId) === -1) $(this).remove();
                     });
                 });
 
+                //If a new user has been added to the list, add them
                 newList.forEach(function(id) {
                   if(listOfIds.indexOf(id) === -1){
                       var newLi = $('<li>').text(id.substring(12));
@@ -291,6 +299,10 @@
                   user.userName = $('#txtUserName').val();
                 }
                 socket.emit('user name response', user);
+              });
+              
+              socket.on('disconnect', function(){
+                pl('server disconnected');
               });
               
               socket.on('disconnect reason', function(reason){

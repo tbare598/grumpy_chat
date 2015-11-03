@@ -1,7 +1,7 @@
 var app = require('express')();
-var http = require('http').Server(app);
+var server = require('http').Server(app);
 var https = require('https');
-var io = require('socket.io')(http);
+var io = require('socket.io')(server);
 var path = require('path');
 var fs = require('fs');
 var favicon = require('serve-favicon');
@@ -11,6 +11,9 @@ var config = {};
 //COMMON FUNCTIONS
 function pl(msg){
   console.log('DEBUG->'+msg);
+}
+function log(msg){
+  console.log(msg);
 }
 //This returns an array with unique elements
 function uniq(a) {
@@ -88,15 +91,15 @@ function searchGoogleImages(term, callback){
     res.on('end', function(){
       var parsed = JSON.parse(body);
       if(parsed.error){
-        console.log('*****ERROR***** searchGoogleImages:');
-        console.log('*****ERROR***** ' + parsed.error.message);
+        log('*****ERROR***** searchGoogleImages:');
+        log('*****ERROR***** ' + parsed.error.message);
         callback(null);
       }else{
         callback(parsed.items);
       }
     });
   }).on('error',function(e){
-    console.log('ERROR: ' + e.message);
+    log('ERROR: ' + e.message);
   });
 }
 
@@ -111,7 +114,7 @@ function printArr(arr){
 
 var userList = [];
 var banList = [];
-var specMsgRegEx = /\/([^\:\/][^\/\s]*)/g;//////Problem with RegEx. Needs to handle spaces
+var specMsgRegEx = /\/([^\:\/][^\/\s]*)/g;//////TODO:HANDLE SPACES USING QUOTES
 
 function getDateTime() {
     var date = new Date();
@@ -186,11 +189,12 @@ function getUserNameList(set){
   return nameList;
 }
 
-function removeSocket(socket, set){
-  return set.filter(function(entry){
+function removeSocket(socket, set, callback){
+  userList = set.filter(function(entry){
                     var ans = entry.socket !== socket;
                     return ans;
                    });
+  callback();
 }
 
 //'actions' is a list of actions to be taken that are
@@ -201,8 +205,6 @@ function findSpecFuncs(actions, msg, callback){
     //Replacing the actions in the msg with placeholders TODO:REMEMEBER TO REPLACE WITH OLD ACTION IF IT IS NOT AN ACTION
     var newMsg = msg;
     uniqActions.forEach(function(action, actionI){
-      pl('newMsg->'+newMsg);
-      pl('action->'+action);
       newMsg = newMsg.replace(action, '/action:'+actionI+'/');
     });
     var updates = [];
@@ -238,8 +240,11 @@ function findSpecFuncs(actions, msg, callback){
 }
 
 function resolveFuncName(funcName, args, callback){
+  funcFound = false;
   switch(funcName.toUpperCase()){
     case 'BN':
+      funcFound = true;
+      
       banUsers(args, userList, function(newUserList){
                                  userList = newUserList
                                  //Remove this action from the message
@@ -247,6 +252,7 @@ function resolveFuncName(funcName, args, callback){
                                  });
       break;
     case 'IMG':
+      funcFound = true;
       //We only use the first arg, because it is the only
       searchImgLink(args, function(imgLink){
                                           if(imgLink){
@@ -261,6 +267,7 @@ function resolveFuncName(funcName, args, callback){
       callback(null);
       break;
   }
+  if(funcFound) log('function call->'+funcName);
 }
 
 function banUsers(userNames, userSet, callback){
@@ -294,35 +301,35 @@ function banUsers(userNames, userSet, callback){
   callback(newUserSet);
 }
 
+
 io.on('connection', function(socket){
-  pl('connection established - ' + getDateTime());
+  log('connection established - ' + getDateTime());
   socket.emit('request user data');
-  
-  socket.on('user name response', function(user){
-    if(user.userName){
-      pl('User Connected: ' + user.userName);
-      updateUserSocket(user.userName,socket);
-      io.emit('user list update', getUserNameList(userList));
-    }else{
-      pl('New User Connected');
-    }
-  });
-  
   //Give the newly connected user, the userList
   socket.emit('user list update', getUserNameList(userList));
   
+  socket.on('user name response', function(user){
+    if(user.userName){
+      log('User Connected: ' + user.userName);
+      updateUserSocket(user.userName, socket);
+      io.emit('user list update', getUserNameList(userList));
+    }else{
+      log('New User Connected');
+    }
+  });
+  
   socket.on('chat message', function(msg){
+    log('msg->' + msg.msg);
     //Find all possible actions
     var specActions = msg.msg.match(specMsgRegEx);
     //plainMsg has all commands removed, and replaced
     findSpecFuncs(specActions, msg.msg, function(plainMsg){
-      pl('plainMsg->' + plainMsg);
       //If the user name wasn't passed in
       if(! msg.userName){
         io.emit('chat message', plainMsg);
       //Else it is a new user sending his first message
       }else{
-        addUserRes = addUser(msg.userName,socket);
+        var addUserRes = addUser(msg.userName,socket);
         if(addUserRes.failed){
           socket.emit('bad user name', addUserRes.reason);
         }else{
@@ -335,10 +342,10 @@ io.on('connection', function(socket){
   });
   
   socket.on('disconnect', function(){
-    pl('user disconnected - ' + getDateTime());
-    userList = removeSocket(socket, userList);
-    socket.disconnect();//TODO:ADD A RECONNECT ATTEMPT
-    io.emit('user list update', getUserNameList(userList));
+    log('user disconnected - ' + getDateTime());
+    removeSocket(socket, userList, function(){
+      io.emit('user list update', getUserNameList(userList));
+    });
   });
 });
 
@@ -347,7 +354,7 @@ fs.readFile('./config.json', 'utf8', function (err, data) {
   if (err) throw err;
   config = JSON.parse(data);
   
-  http.listen(config.port, function(){
-      console.log('listening on *:' + config.port);
+  server.listen(config.port, function(){
+      log('listening on *:' + config.port);
   });
 });
