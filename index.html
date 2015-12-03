@@ -165,33 +165,33 @@
                           audio.addEventListener("ended", function(){
                               audio.currentTime = 0;
                               
-                              //This is for alert notifications and for title bar flashy text
-                              //We want this after the sound notification finishes, because otherwise 
-                              //the sound will be paused until this alert is clicked away.
-                              if((!stopAlerts) && $('#chkAlerts').is(':checked')){
-                                  //Stop more alerts
-                                  startAlerts(false);
-                                  var oldTitle = document.title;
-                                  var msg = "New Message!";
-                                  var timeoutId;
-                                  var blink = function() { document.title = document.title == msg ? ' ' : msg; };
-                                  var clear = function() {
-                                      clearInterval(timeoutId);
-                                      document.title = oldTitle;
-                                      window.onmousemove = null;
-                                      timeoutId = null;
-                                  };
-                                  
-                                  if (!timeoutId) {
-                                      timeoutId = setInterval(blink, 1000);
-                                      window.onmousemove = clear;
-                                  }
-                                  if ($('#chkAlerts').is(':checked'))
-                                      alert(msg);
-                              }
-                            });
+                          });
                       }
-                      
+                    
+                      //This is for alert notifications and for title bar flashy text
+                      //We want this after the sound notification finishes, because otherwise 
+                      //the sound will be paused until this alert is clicked away.
+                      if((!stopAlerts) && $('#chkAlerts').is(':checked')){
+                          //Stop more alerts
+                          startAlerts(false);
+                          var oldTitle = document.title;
+                          var msg = "New Message!";
+                          var timeoutId;
+                          var blink = function() { document.title = document.title == msg ? ' ' : msg; };
+                          var clear = function() {
+                              clearInterval(timeoutId);
+                              document.title = oldTitle;
+                              window.onmousemove = null;
+                              timeoutId = null;
+                          };
+                          
+                          if (!timeoutId) {
+                              timeoutId = setInterval(blink, 1000);
+                              window.onmousemove = clear;
+                          }
+                          if ($('#chkAlerts').is(':checked'))
+                              alert(msg);
+                      }
                   }
               }
 
