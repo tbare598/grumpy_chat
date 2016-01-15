@@ -1,0 +1,90 @@
+* { 
+    box-sizing: border-box;
+    margin: 0; 
+    padding: 0;
+}
+.txtMsgBorder{
+  padding: .5%;
+}
+#divChatBox{
+  position: absolute;
+  top: calc(100% - 35px);
+  height: 35px;
+  width: 75%;
+}
+#frmChatSend { height: 100%; }
+#frmChatSend * { height: 100%; border-radius: 4px; border-color: #000; }
+#frmChatSend input { width: 80%; margin-right: .5%; }
+#frmChatSend button { width: 19.5%; background: rgb(130, 224, 255); }
+#userList { list-style-type: none; margin: 0; padding: 0; }
+#userList li { padding: .2% 2%; }
+#messages { list-style-type: none; margin: 0; padding: 0; }
+#messages li { padding: .2% 2%; }
+#messages li:nth-child(odd) { background: #eee; }
+.overlay{
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  background: rgba(51,51,51,0.7);
+  z-index: 10;
+}
+#over{
+  position:absolute;
+  width:100%;
+  height:100%;
+  text-align: center; /*handles the horizontal centering*/
+}
+/*handles the vertical centering*/
+.Centerer{
+  display: inline-block;
+  height: 100%;
+  vertical-align: middle;
+}
+.Centered{
+  display: inline-block;
+  vertical-align: middle;
+  width: 90%;
+}
+body { font: 13px Helvetica, Arial; }
+#Alerts { vertical-align: top; }
+#divChat { 
+  position:absolute;
+  overflow-y: scroll;
+  width:75%; 
+  height: calc(100% - 35px);
+}
+#txtUserName{
+  font-size:200%
+}
+#divUserList {
+  overflow-y: scroll;
+  left: 75%;
+  width: 25%;
+  height: calc(100% - 35px);
+  position: absolute;
+}
+#ulAlerts{
+  padding: 2%;
+  min-width: 100%
+}
+#btnAlerts{
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+#divAlerts{
+  position: absolute;
+  width: 25%;
+  height: 35px;
+  top: calc(100% - 35px);
+  left: 75%;
+  padding: .5%;
+}
+
+#divAlerts div{
+  height: 100%;
+} 
+img { max-width:100%; max-height:100%; }

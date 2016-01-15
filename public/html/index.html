@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="css/grumpy_chat.css" >
+    <title>Socket.IO chat</title>
+  </head>
+  <body>
+      <div id='divOverlay' class='overlay'>
+        <div id='over'>
+          <span class="Centerer"></span>
+            <form id="frmUserName" class="Centered">
+              <input id="txtUserName" autofocus="autofocus" autocomplete="off" placeholder="Enter Username" />
+            </form>
+        </div>
+      </div>
+      <div id="divGrumpyChat">
+        <div id="divChat">
+            <ul id="messages"></ul>
+        </div>
+        <div id="divUserList">
+            <ul id="userList"></ul>
+        </div>
+        <div id="divChatBox">
+          <form id="frmChatSend" class='txtMsgBorder' action="">
+              <input id="txtMsg" autocomplete="off" /><button>Send</button>
+          </form>
+        </div>         
+        <div id="divAlerts">
+          <div class="dropup">
+            <button id="btnAlerts" class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Alerts
+            <span class="caret"></span></button>
+            <ul id='ulAlerts' class="dropdown-menu">
+              <li>
+                <label><input type="checkbox" id="chkPopup">Popup</label>
+              </li>
+              <li>
+                <label><input type="checkbox" id="chkSound" >Sound</label>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="javascript/grumpy_chat.js"></script>
+  </body>
+</html>
