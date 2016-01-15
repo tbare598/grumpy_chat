@@ -27,27 +27,21 @@ function uniq(a) {
 app.use(favicon(__dirname + '/public/images/favicon.ico'));
 
 app.get('/', function (req, res) {
-    res.sendFile(path.resolve('index.html'));
+    res.sendFile(path.resolve(__dirname 
+                           + '/public/html/index.html'));
 });
 
 app.get('/beeper', function (req, res) {
     res.sendFile(path.resolve('beeper.html'));
 });
 
-app.get('/sounds/:resource', function (req, res) {
+//This will had out requests to the public directory, on
+//get requests
+app.get('/:resource_type/:resource', function (req, res) {
     var resourceFilePath = path.resolve(__dirname 
-                            + '/public/sounds/' 
-                            + req.params.resource);
-    if(fs.existsSync(resourceFilePath)){
-      res.sendFile(resourceFilePath);
-    }else{
-      res.status(404).send('404: Page not Found');
-    }
-});
-
-app.get('/shared/:resource', function (req, res) {
-    var resourceFilePath = path.resolve(__dirname 
-                            + '/public/shared/' 
+                            + '/public/'
+                            + req.params.resource_type
+                            + '/' 
                             + req.params.resource);
     if(fs.existsSync(resourceFilePath)){
       res.sendFile(resourceFilePath);
@@ -104,14 +98,6 @@ function searchGoogleImages(term, callback){
 }
 
 
-function printArr(arr){
-  var i = 0;
-  arr.forEach(function(index){
-    pl(i + ' - ' + index.userName);
-    i += 1;
-  });
-}
-
 var userList = [];
 var banList = [];
 var specMsgRegEx = /\/([^\:\/][^\/\s]*)/g;//////TODO:HANDLE SPACES USING QUOTES
@@ -131,60 +117,75 @@ function getDateTime() {
     return month + "/" + day + " " + hour + ":" + min + ":" + sec;
 }
 
+function getRandInt(min, max) {
+    return Math.floor(min + (Math.random() * max));
+}
 
-function nameExistsIn(name, set){
+function getUserId(){
+  var a = 'abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789~!@#$%^&*()_+{}|:"?><`-=[]\;,./';
+  var uid = ''; 
+  for(x=0;x<1024;x++){
+    randNumb = getRandInt(0, a.length-1);
+    uid += a[randNumb];
+  }
+  return uid;
+}
+
+function usernameExistsIn(name, set){
   var matches = set.filter(function (entry){
                   return entry.userName === name;
                 });
-  return matches;
+  if(matches && matches.length > 0)
+    return true;
+  else
+    return false;
 }
 
-function addUser(userName,socket){
-  var response = { "reason" : "", "failed" : false };
-  var dupUsers = nameExistsIn(userName, userList);
-  //If there are already users found with that name
-  if(dupUsers && dupUsers.length > 0){
+function addUser(user, response, callback){
+  //If the user's socket exists within the UserList, then remove it.
+  //Though it should not be in there in the first place
+  removeSocket(user.socket, userList);
+  if(usernameExistsIn(user.userName, userList)){
     response.failed = true;
-    
-    //There really should only be one user found, because we
-    //wouldn't of added it before, if there were dups found
-    dupUsers.forEach(function(name){
-      //If any of the names were found to be banned,
-      //respond with that
-      if(name.banned){
-        response.reason = "banned";
-        return response;
-      }
-    });
-    if(response.reason != "banned")
-      response.reason = "duplicate";
+    response.reason = 'duplicate';
   }else{
-    userList.push({ 'userName' : userName,
-                    'socket'   : socket,
-                    'banned'   : false});
+    user.uid = getUserId() + user.userName;
+    userList.push(user);
     response.failed = false;
   }
-  return response;
+  callback(response);
 }
 
-function updateUserSocket(userName, socket){
-  userFound = false;
-  userList.forEach(function (user){
-      if(user.userName === userName){
-        user.socket = socket;
+function updateUser(user, callback){
+  var response = { "reason" : "", "failed" : true };
+  var userFound = false;
+  if(user.uid){
+    userList.forEach(function (aUser){
+      if(aUser.userName === user.userName){
         userFound = true;
+        //The uid and username have to be the same for a user
+        if(aUser.uid === user.uid){
+          aUser.socket = user.socket;
+          response.failed = false;
+        }else{
+          response.failed = true;
+          response.reason = "username uid mismatch";
+        }
       }
     });
-  if(! userFound)
-    addUser(userName,socket);
+    if(!userFound)
+      addUser(user, response, callback);
+    else
+      callback(response);
+  }else{
+    addUser(user, response, callback);
+  }
 }
 
 function getUserNameList(set){
   var nameList = [];
   for(var i = 0; i < set.length; i++){
-    if(!set[i].banned){
-      nameList.push(set[i].userName);
-    }
+    nameList.push(set[i].userName);
   }
   return nameList;
 }
@@ -194,7 +195,6 @@ function removeSocket(socket, set, callback){
                     var ans = entry.socket !== socket;
                     return ans;
                    });
-  callback();
 }
 
 //'actions' is a list of actions to be taken that are
@@ -244,16 +244,17 @@ function resolveFuncName(funcName, args, callback){
   switch(funcName.toUpperCase()){
     case 'BN':
       funcFound = true;
-      
+      //removing the banUser function for now
+      callback(' ');
+      /*
       banUsers(args, userList, function(newUserList){
                                  userList = newUserList
                                  //Remove this action from the message
                                  callback(' ');
-                                 });
+                                 });*/
       break;
     case 'IMG':
       funcFound = true;
-      //We only use the first arg, because it is the only
       searchImgLink(args, function(imgLink){
                                           if(imgLink){
                                             callback(imgLink+' ');
@@ -301,50 +302,69 @@ function banUsers(userNames, userSet, callback){
   callback(newUserSet);
 }
 
+MAX_MSGS=250;
+var msgArray = [];
+function addMsgToArr(msg, callback){
+  //Add the message to the beginning of the array, so that we
+  //can slice off messages beyond MAX_MSGS
+  msgArray.unshift(msg);
+  msgArray = msgArray.slice(0, MAX_MSGS);
+  
+  if (callback) callback();
+}
+
+var msgId = 0;
+function getMsgId(){
+  msgId++;
+  var newMsgId = Date.now().toString() + '_' + msgId.toString();
+  return newMsgId;
+}
+
+function getOldMsgs(){
+  return msgArray;
+}
 
 io.on('connection', function(socket){
   log('connection established - ' + getDateTime());
-  socket.emit('request user data');
-  //Give the newly connected user, the userList
-  socket.emit('user list update', getUserNameList(userList));
   
-  socket.on('user name response', function(user){
-    if(user.userName){
-      log('User Connected: ' + user.userName);
-      updateUserSocket(user.userName, socket);
-      io.emit('user list update', getUserNameList(userList));
-    }else{
-      log('New User Connected');
-    }
-  });
-  
-  socket.on('chat message', function(msg){
-    log('msg->' + msg.msg);
-    //Find all possible actions
-    var specActions = msg.msg.match(specMsgRegEx);
-    //plainMsg has all commands removed, and replaced
-    findSpecFuncs(specActions, msg.msg, function(plainMsg){
-      //If the user name wasn't passed in
-      if(! msg.userName){
-        io.emit('chat message', plainMsg);
-      //Else it is a new user sending his first message
+  socket.on('user connect', function(user){
+    user.socket = socket;
+	
+    updateUser(user, function(updUserRes){
+      if(updUserRes.failed){
+        socket.emit('bad user name', updUserRes.reason);
       }else{
-        var addUserRes = addUser(msg.userName,socket);
-        if(addUserRes.failed){
-          socket.emit('bad user name', addUserRes.reason);
-        }else{
-          io.emit('chat message', plainMsg);
-        }
+        //Keep users from reconnecting multiple times
+        socket.removeAllListeners('user connect');
+        io.emit('user list update', getUserNameList(userList));
+        socket.emit('server connection', 
+                    { "uid"     : user.uid, 
+                      "oldMsgs" : getOldMsgs()});
+    
+        //Setting the socket actions only after a user has 
+        //successfully connected
+        
+        socket.on('chat message', function(msg){
+          log('msg->' + user.userName + ' -> ' + msg);
+          //Find all possible actions
+          var specActions = msg.match(specMsgRegEx);
+          //plainMsg has all commands removed, and replaced
+          findSpecFuncs(specActions, msg, function(plainMsg){
+            var usrMsg = user.userName + ' -> ' + plainMsg;
+            var nextMsgId = getMsgId();
+            var msgObj = { 'msg' : usrMsg,
+                           'id'  : nextMsgId };
+            addMsgToArr(msgObj);
+            io.emit('chat message', msgObj);
+          });
+        });
+          
+        socket.on('disconnect', function(){
+          log('user disconnected - ' + getDateTime());
+          removeSocket(socket, userList);
+          io.emit('user list update', getUserNameList(userList));
+        });
       }
-      //Send update
-      io.emit('user list update', getUserNameList(userList));
-    });
-  });
-  
-  socket.on('disconnect', function(){
-    log('user disconnected - ' + getDateTime());
-    removeSocket(socket, userList, function(){
-      io.emit('user list update', getUserNameList(userList));
     });
   });
 });
