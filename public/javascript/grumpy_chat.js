@@ -153,6 +153,8 @@ $(document).ready(function() {
       liMsg = $('<li '
                + 'id="liMsg_'+aMsg.id+'" '
                + 'title="' + formatTime(new Date()) + '">').text(aMsg.msg);
+      //Hiding the message, until it is finished formatting.
+      liMsg.hide();
                
       //Converting back to text
       var msgText = liMsg[0].innerHTML;
@@ -163,6 +165,7 @@ $(document).ready(function() {
         //text to the list element
         liMsg.text('');
         liMsg.append(msg);
+        liMsg.show();
         
         var div = $('#divChat');
         div.scrollTop(div[0].scrollHeight);
