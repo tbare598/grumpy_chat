@@ -13,7 +13,7 @@ function pl(msg){
   console.log('DEBUG->'+msg);
 }
 function log(msg){
-  console.log(msg);
+  console.log(getDateTime() + ' - ' + msg);
 }
 //This returns an array with unique elements
 function uniq(a) {
@@ -325,7 +325,7 @@ function getOldMsgs(){
 }
 
 io.on('connection', function(socket){
-  log('connection established - ' + getDateTime());
+  log('connection established');
   
   socket.on('user connect', function(user){
     user.socket = socket;
@@ -334,6 +334,8 @@ io.on('connection', function(socket){
       if(updUserRes.failed){
         socket.emit('bad user name', updUserRes.reason);
       }else{
+        log('user "' + user.userName + '" connected');
+        
         //Keep users from reconnecting multiple times
         socket.removeAllListeners('user connect');
         io.emit('user list update', getUserNameList(userList));
@@ -341,8 +343,8 @@ io.on('connection', function(socket){
                     { "uid"     : user.uid, 
                       "oldMsgs" : getOldMsgs()});
     
-        //Setting the socket actions only after a user has 
-        //successfully connected
+        //Setting the following socket listeners only after 
+        //a user has successfully connected
         
         socket.on('chat message', function(msg){
           log('msg->' + user.userName + ' -> ' + msg);
@@ -360,7 +362,7 @@ io.on('connection', function(socket){
         });
           
         socket.on('disconnect', function(){
-          log('user disconnected - ' + getDateTime());
+          log('user disconnected');
           removeSocket(socket, userList);
           io.emit('user list update', getUserNameList(userList));
         });

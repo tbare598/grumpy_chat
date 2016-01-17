@@ -145,30 +145,31 @@ $(document).ready(function() {
   }
   
   function postMsg(aMsg){
-    var newMsg = aMsg.msg;
-    //Creating an li and adding timestamp, id, and formatted msg
-    //Making a list object with HTML safe text
-    newMsg = $('<li '
-             + 'id="liMsg_'+aMsg.id+'" '
-             + 'title="' + formatTime(new Date()) + '">').text(newMsg);
-    //Converting back to text
-    var msgText = newMsg[0].innerHTML;
+    var liMsg=$('#liMsg_'+aMsg.id);
+    //If the msg li element does not exist, create it
+    if(!liMsg.length){
+      //Creating an li and adding timestamp, id, and formatted msg
+      //Making a list object with HTML safe text
+      liMsg = $('<li '
+               + 'id="liMsg_'+aMsg.id+'" '
+               + 'title="' + formatTime(new Date()) + '">').text(aMsg.msg);
+               
+      //Converting back to text
+      var msgText = liMsg[0].innerHTML;
     
-    $('#messages').append(newMsg);
-    
-    //Adding links/images. When that's done, display it
-    formatMessage(msgText, function(msg){
-      //Get li created above
-      liMsg=$('#liMsg_'+aMsg.id);
-      
-      //Clear the text from the list element, then add the formatted
-      //text to the list element
-      liMsg.text('');
-      liMsg.append(msg);
-      
-      var div = $('#divChat');
-      div.scrollTop(div[0].scrollHeight);
-    });
+      //Adding links/images. When that's done, display it
+      formatMessage(msgText, function(msg){
+        //Clear the text from the list element, then add the formatted
+        //text to the list element
+        liMsg.text('');
+        liMsg.append(msg);
+        
+        var div = $('#divChat');
+        div.scrollTop(div[0].scrollHeight);
+      });
+    }
+    //Put/Move the li element on/to the end
+    $('#messages').append(liMsg);
   }
   
   $('#frmUserName').submit(function(){
@@ -198,7 +199,6 @@ $(document).ready(function() {
   socket.on('server connection', function(data){
     pl('connected with server');
     userData.uid = data.uid;
-    pl(data.oldMsgs);
     postOldMsgs(data.oldMsgs);
     $('#divOverlay').hide();
     $('#txtMsg').focus();
