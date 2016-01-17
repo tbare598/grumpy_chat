@@ -1,11 +1,11 @@
 var app = require('express')();
 var server = require('http').Server(app);
-var https = require('https');
 var io = require('socket.io')(server);
 var path = require('path');
 var fs = require('fs');
 var favicon = require('serve-favicon');
-var uni = require('./helper/universal.js');
+var uni = require(path.resolve(__dirname + '/helper/universal.js'));
+var goog = require(path.resolve(__dirname + '/webservices/google.js'));
 var config = {};
 
 var log = uni.log;
@@ -37,52 +37,6 @@ app.get('/:resource_type/:resource', function (req, res) {
     }
 });
 
-function searchImgLink(terms, callback){
-  //If there are multiple search terms, combine them together
-  term = '';
-  terms.forEach(function(aTerm){
-    term += aTerm + ';';
-  });
-  
-  searchGoogleImages(term, function(items){
-    if(items){
-      //If there a thumbnail, return that, if not the full size image
-      if(items[0].image.thumbnailLink){
-        callback(items[0].image.thumbnailLink);
-      }else{
-        callback(items[0].link);
-      }
-    }else{
-      callback(null);
-    }
-  });
-}
-
-function searchGoogleImages(term, callback){
-  var imgSearchStr='https://www.googleapis.com/customsearch/v1?key=AIzaSyCe4ud61IKC8B2dfQ2bDAgdvfxLGE9dNTw&cx=002547328973189675934:shd-4zof6nk&q='
-                 + term
-                 + '&searchType=image&alt=json';
-                    //&fileType=jpg
-  
-  https.get(imgSearchStr, function(res){
-    var body = '';
-    res.on('data', function(data){
-      body += data;
-    });
-    res.on('end', function(){
-      var parsed = JSON.parse(body);
-      if(parsed.error){
-        log('*****ERROR***** searchGoogleImages:');
-        log('*****ERROR***** ' + parsed.error.message);
-        callback(null);
-      }else{
-        callback(parsed.items);
-      }
-    });
-  }).on('error',function(e){
-    log('ERROR: ' + e.message);
-  });
-}
 
 
 var userList = [];
@@ -107,7 +61,7 @@ function addUser(user, response, callback){
     response.failed = true;
     response.reason = 'duplicate';
   }else{
-    user.uid = uni.getRandToken(1024)() + user.userName;
+    user.uid = uni.getRandToken(1024) + user.userName;
     userList.push(user);
     response.failed = false;
   }
@@ -176,12 +130,16 @@ function findSpecFuncs(actions, msg, callback){
       //The first arg(args.shift()) is the function name
       resolveFuncName(args.shift(),
                       args,
-                      function(update){
+                      function(update, err){
                         if(update){
                           updates[uniqActionsI] = update;
                         }else{
-                          //Else there is nothing to update, put old action back in
+                          //Else there is nothing to update, put old action back in.
+                          //We don't want to remove the action from the message, even if
+                          //there was an error.
                           updates[uniqActionsI] = action;
+                          //If there was an error, then log it an continue.
+                          if(err){ log(err.message); }
                         }
                         finishedActionCount++;
                         if(finishedActionCount === uniqActions.length){
@@ -213,14 +171,20 @@ function resolveFuncName(funcName, args, callback){
       break;
     case 'IMG':
       funcFound = true;
-      searchImgLink(args, function(imgLink){
-                                          if(imgLink){
-                                            callback(imgLink+' ');
-                                          }else{
-                                            //Image lookup failed
-                                            callback(null);
-                                          }
-                                          });
+      //If there are multiple search terms, combine them together
+      var term = '';
+      args.forEach(function(aTerm){ 
+                    term += aTerm + ';'; 
+                   });
+      goog.findAnImgLink(term, 
+                         function(imgLink, err){
+                           if(imgLink){
+                             callback(imgLink+' ');
+                           }else{
+                             //Image lookup failed
+                             callback(null, err);
+                           }
+                         });
       break;
     default:
       callback(null);
