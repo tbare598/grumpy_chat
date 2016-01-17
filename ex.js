@@ -5,34 +5,21 @@ var io = require('socket.io')(server);
 var path = require('path');
 var fs = require('fs');
 var favicon = require('serve-favicon');
+var uni = require('./helper/universal.js');
 var config = {};
 
-////////////////////////////////////////////////////////////
-//COMMON FUNCTIONS
+var log = uni.log;
+
+//Just a debugging helper
 function pl(msg){
   console.log('DEBUG->'+msg);
 }
-function log(msg){
-  console.log(getDateTime() + ' - ' + msg);
-}
-//This returns an array with unique elements
-function uniq(a) {
-  var seen = new Set();
-  return a.filter(function(x) {
-    return !seen.has(x) && seen.add(x);
-  })
-}
-///////////////////////////////////////////////////////////
 
 app.use(favicon(__dirname + '/public/images/favicon.ico'));
 
 app.get('/', function (req, res) {
     res.sendFile(path.resolve(__dirname 
                            + '/public/html/index.html'));
-});
-
-app.get('/beeper', function (req, res) {
-    res.sendFile(path.resolve('beeper.html'));
 });
 
 //This will had out requests to the public directory, on
@@ -102,35 +89,6 @@ var userList = [];
 var banList = [];
 var specMsgRegEx = /\/([^\:\/][^\/\s]*)/g;//////TODO:HANDLE SPACES USING QUOTES
 
-function getDateTime() {
-    var date = new Date();
-    var hour = date.getHours();
-    hour = (hour < 10 ? "0" : "") + hour;
-    var min  = date.getMinutes();
-    min = (min < 10 ? "0" : "") + min;
-    var sec  = date.getSeconds();
-    sec = (sec < 10 ? "0" : "") + sec;
-    var month = date.getMonth() + 1;
-    month = (month < 10 ? "0" : "") + month;
-    var day  = date.getDate();
-    day = (day < 10 ? "0" : "") + day;
-    return month + "/" + day + " " + hour + ":" + min + ":" + sec;
-}
-
-function getRandInt(min, max) {
-    return Math.floor(min + (Math.random() * max));
-}
-
-function getUserId(){
-  var a = 'abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789~!@#$%^&*()_+{}|:"?><`-=[]\;,./';
-  var uid = ''; 
-  for(x=0;x<1024;x++){
-    randNumb = getRandInt(0, a.length-1);
-    uid += a[randNumb];
-  }
-  return uid;
-}
-
 function usernameExistsIn(name, set){
   var matches = set.filter(function (entry){
                   return entry.userName === name;
@@ -149,7 +107,7 @@ function addUser(user, response, callback){
     response.failed = true;
     response.reason = 'duplicate';
   }else{
-    user.uid = getUserId() + user.userName;
+    user.uid = uni.getRandToken(1024)() + user.userName;
     userList.push(user);
     response.failed = false;
   }
@@ -201,7 +159,7 @@ function removeSocket(socket, set, callback){
 //in this kind of format  /func:arg1:arg2:etc
 function findSpecFuncs(actions, msg, callback){
   if(actions){
-    var uniqActions = uniq(actions);
+    var uniqActions = uni.uniq(actions);
     //Replacing the actions in the msg with placeholders TODO:REMEMEBER TO REPLACE WITH OLD ACTION IF IT IS NOT AN ACTION
     var newMsg = msg;
     uniqActions.forEach(function(action, actionI){
