@@ -171,20 +171,7 @@ function resolveFuncName(funcName, args, callback){
       break;
     case 'IMG':
       funcFound = true;
-      //If there are multiple search terms, combine them together
-      var term = '';
-      args.forEach(function(aTerm){ 
-                    term += aTerm + ';'; 
-                   });
-      goog.findAnImgLink(term, 
-                         function(imgLink, err){
-                           if(imgLink){
-                             callback(imgLink+' ');
-                           }else{
-                             //Image lookup failed
-                             callback(null, err);
-                           }
-                         });
+      chatImgSearch(args, callback);
       break;
     default:
       callback(null);
@@ -222,6 +209,30 @@ function banUsers(userNames, userSet, callback){
     }
   });
   callback(newUserSet);
+}
+
+function chatImgSearch(terms, callback){
+  //If there are multiple search terms, combine them together
+  var term = '';
+  terms.forEach(function(aTerm){ 
+                  term += aTerm + ';'; 
+                });
+  goog.searchGoogleImages(term, 
+      function(images, err){
+        if(!err && images){
+          var imgLink = '';
+          //If there a thumbnail, return that, if not the full size image
+          if(images[0].image.thumbnailLink){
+            imgLink = images[0].image.thumbnailLink;
+          }else{
+            imgLink = images[0].link;
+          }
+          callback(imgLink+' ');
+        }else{
+          //Image lookup failed
+          callback(null, err);
+        }
+      });
 }
 
 MAX_MSGS=250;
