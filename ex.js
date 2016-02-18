@@ -43,9 +43,9 @@ var userList = [];
 var banList = [];
 var specMsgRegEx = /\/([^\:\/][^\/\s]*)/g;//////TODO:HANDLE SPACES USING QUOTES
 
-function usernameExistsIn(name, set){
+function nameExistsIn(name, set){
   var matches = set.filter(function (entry){
-                  return entry.userName === name;
+                  return entry.name === name;
                 });
   if(matches && matches.length > 0)
     return true;
@@ -53,58 +53,43 @@ function usernameExistsIn(name, set){
     return false;
 }
 
-function addUser(user, response, callback){
-  //If the user's socket exists within the UserList, then remove it.
-  //Though it should not be in there in the first place
-  removeSocket(user.socket, userList);
-  if(usernameExistsIn(user.userName, userList)){
+function addUser(user, callback){
+  var response = { "reason" : "", "failed" : true };
+  if(nameExistsIn(user.name, userList)){
     response.failed = true;
     response.reason = 'duplicate';
   }else{
-    user.uid = uni.getRandToken(1024) + user.userName;
     userList.push(user);
     response.failed = false;
   }
   callback(response);
 }
 
-function updateUser(user, callback){
-  var response = { "reason" : "", "failed" : true };
-  var userFound = false;
-  if(user.uid){
-    userList.forEach(function (aUser){
-      if(aUser.userName === user.userName){
-        userFound = true;
-        //The uid and username have to be the same for a user
-        if(aUser.uid === user.uid){
-          aUser.socket = user.socket;
-          response.failed = false;
-        }else{
-          response.failed = true;
-          response.reason = "username uid mismatch";
-        }
-      }
-    });
-    if(!userFound)
-      addUser(user, response, callback);
-    else
-      callback(response);
-  }else{
-    addUser(user, response, callback);
-  }
-}
-
 function getUserNameList(set){
   var nameList = [];
   for(var i = 0; i < set.length; i++){
-    nameList.push(set[i].userName);
+    nameList.push(set[i].name);
   }
   return nameList;
 }
 
-function removeSocket(socket, set, callback){
+function getUserData(set){
+  var userData = [];
+  var clientSafeData = [ 'name', 'img' ];
+  
+  set.forEach(function(user){
+    var userObj = {};
+    clientSafeData.forEach(function(key){
+      userObj[key] = user[key];
+    });
+    userData.push(userObj);
+  });
+  return userData;
+}
+
+function removeUserName(set, name){
   userList = set.filter(function(entry){
-                    var ans = entry.socket !== socket;
+                    var ans = entry.name !== name;
                     return ans;
                    });
 }
@@ -180,37 +165,6 @@ function resolveFuncName(funcName, args, callback){
   if(funcFound) log('function call->'+funcName);
 }
 
-function banUsers(userNames, userSet, callback){
-  var newUserSet = userSet;
-  //For each user name that we want to remove
-  userNames.forEach(function(userName){
-    //If true, that means the userName already exists. If false, we want
-    //to create that userName, and set it to banned
-    if(nameExistsIn(userName, newUserSet).length > 0){
-      //Loop through all the users, and ban the user with the matching userName
-      newUserSet.forEach(function(user){
-        //If this user is in the list of names to be kicked,
-        //disconnect them and set them to banned
-        if(userName === user.userName){
-          user.socket.emit('disconnect reason', 'You have been kicked');
-          user.socket.disconnect();
-          user.banned = true;
-        //If the next user's banned status is not defined, set it to false
-        }else if(typeof user.banned === 'undefined'){
-          user.banned = false;
-        }else{
-          user.banned = user.banned;
-        }
-      });
-    }else{
-      var newUser = { "userName" : userName,
-                        "banned" : true };
-      newUserSet.push(newUser);
-    }
-  });
-  callback(newUserSet);
-}
-
 function chatImgSearch(terms, callback){
   //If there are multiple search terms, combine them together
   var term = '';
@@ -261,43 +215,46 @@ io.on('connection', function(socket){
   log('connection established');
   
   socket.on('user connect', function(user){
-    user.socket = socket;
-	
-    updateUser(user, function(updUserRes){
+    addUser(user, function(updUserRes){
       if(updUserRes.failed){
         socket.emit('bad user name', updUserRes.reason);
       }else{
-        log('user "' + user.userName + '" connected');
+        log('user "' + user.name + '" connected');
         
         //Keep users from reconnecting multiple times
         socket.removeAllListeners('user connect');
-        io.emit('user list update', getUserNameList(userList));
+        io.emit('user list update', getUserData(userList));
         socket.emit('server connection', 
-                    { "uid"     : user.uid, 
-                      "oldMsgs" : getOldMsgs()});
+                    { "oldMsgs" : getOldMsgs()});
     
         //Setting the following socket listeners only after 
         //a user has successfully connected
         
         socket.on('chat message', function(msg){
-          log('msg->' + user.userName + ' -> ' + msg);
+          log('msg->' + user.name + ' -> ' + msg);
           //Find all possible actions
           var specActions = msg.match(specMsgRegEx);
           //plainMsg has all commands removed, and replaced
           findSpecFuncs(specActions, msg, function(plainMsg){
-            var usrMsg = user.userName + ' -> ' + plainMsg;
             var nextMsgId = getMsgId();
-            var msgObj = { 'msg' : usrMsg,
-                           'id'  : nextMsgId };
+            //TODO:REMOVE USERID FROM THE MESSAGE
+            var msgObj = { 'user' : user,
+                           'id'   : nextMsgId,
+                           'msg'  : plainMsg };
             addMsgToArr(msgObj);
             io.emit('chat message', msgObj);
           });
         });
           
+        socket.on('update user data', function(userData){
+          user.img = userData.img;
+          io.emit('user list update', getUserData(userList));
+        });
+          
         socket.on('disconnect', function(){
-          log('user disconnected');
-          removeSocket(socket, userList);
-          io.emit('user list update', getUserNameList(userList));
+          log('user "'+ user.name +'" disconnected');
+          removeUserName(userList, user.name);
+          io.emit('user list update', getUserData(userList));
         });
       }
     });

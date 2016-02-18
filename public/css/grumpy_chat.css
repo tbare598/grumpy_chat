@@ -4,7 +4,7 @@
     padding: 0;
 }
 .txtMsgBorder{
-  padding: .5%;
+  padding: 2px;
 }
 #divChatBox{
   position: absolute;
@@ -12,10 +12,10 @@
   height: 35px;
   width: 75%;
 }
-#frmChatSend { height: 100%; }
+#frmChatSend { height: 100%; padding-left: 2px; padding-right: 2px; }
 #frmChatSend * { height: 100%; border-radius: 4px; border-color: #000; }
-#frmChatSend input { width: 80%; margin-right: .5%; }
-#frmChatSend button { width: 19.5%; background: rgb(130, 224, 255); }
+#frmChatSend input { width: calc(80% - 2px); margin-right: 2px; }
+#frmChatSend button { width: 20%; background: rgb(130, 224, 255); }
 #userList { list-style-type: none; margin: 0; padding: 0; }
 #userList li { padding: .2% 2%; }
 #messages { list-style-type: none; margin: 0; padding: 0; }
@@ -48,7 +48,7 @@
   width: 90%;
 }
 body { font: 13px Helvetica, Arial; }
-#Alerts { vertical-align: top; }
+
 #divChat { 
   position:absolute;
   overflow-y: scroll;
@@ -65,26 +65,85 @@ body { font: 13px Helvetica, Arial; }
   height: calc(100% - 35px);
   position: absolute;
 }
-#ulAlerts{
-  padding: 2%;
-  min-width: 100%
-}
-#btnAlerts{
+
+#btnOptions{
   width: 100%;
   height: 100%;
   padding: 0;
+  border-radius: 2px;
 }
 
-#divAlerts{
+#ulOptions{
+  padding: 2%;
+  min-width: 100%
+}
+
+#ulOptions li label{
+  width: 100%;
+  margin: 0;
+}
+
+#ulOptions img{
+  border-radius: 4px;
+  margin: 2px;
+  margin-top: 0px;
+  height: 25px;
+  width: 25px;
+}
+
+#imgPlusSign{
+  position: absolute;
+  top: 5px;
+  left: 5px;
+}
+
+.see_through{
+  opacity: 0.0;
+}
+
+#txtAddIconURL{
+  padding-left: 2px;
+  border-radius: 4px;
+  border-color: #000;
+  width: calc(100% - 33px);
+}
+
+#lblAddIconURL{
+  background: lightblue;
+}
+
+#divOptions{
   position: absolute;
   width: 25%;
-  height: 35px;
+  height: 31px;
   top: calc(100% - 35px);
   left: 75%;
-  padding: .5%;
+  padding: 2px;
+  background: black;
+  border-radius: 4px;
+  margin-top: 2px;
+  margin-bottom: 2px;
 }
 
-#divAlerts div{
+#divOptions div{
   height: 100%;
-} 
-img { max-width:100%; max-height:100%; }
+}
+
+img { 
+  max-width:100%; 
+  max-height:100%; 
+}
+
+.label_hover{
+  background:#ddd;
+}
+  
+.icon { 
+  height:25px; 
+  width:25px
+}
+
+ul hr {
+  margin-top:5px;
+  margin-bottom:5px;
+}

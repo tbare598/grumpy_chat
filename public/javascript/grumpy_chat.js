@@ -1,5 +1,6 @@
 var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 var userData = {};
+var userList = [];
 
 function formatTime(time){
   var formatted = '';
@@ -20,9 +21,40 @@ function formatTime(time){
   return formatted;
 }
 
+function sanitize(aStr){
+  var sanitizedTxt = $('<div>').text(aStr).html();
+  return sanitizedTxt;
+}
+
 function pl(msg) {
     console.log('DEBUG->' + msg);
 };
+
+function obj(objToPrint) {
+    console.log(objToPrint);
+};
+
+function compareObjects(obj1, obj2){
+  var keys1 = Object.keys(obj1);
+  var keys2 = Object.keys(obj2);
+  
+  if(keys1.length !== keys2.length) return false;
+  
+  var returnVal = true;
+  keys1.forEach(function(key){
+    if(obj1[key] !== obj2[key]) returnVal = false;
+  });
+  
+  return returnVal;
+}
+
+function removeUserName(set, name, callback){
+  set = set.filter(
+    function(entry){
+      return entry.name !== name;
+    });
+  callback(set);
+}
 
 $(document).ready(function() {
   var socket = io();
@@ -100,84 +132,169 @@ $(document).ready(function() {
   })();
   
   function doAlert() {
-      if(!winFocus){
-          //This is for sound alert
-          if ($('#chkSound').is(':checked')){
-              var audio = new Audio('sounds/notif.wav');
-              audio.play();
-              //When audio is done, show alert alert
-              audio.addEventListener("ended", function(){
-                  audio.currentTime = 0;
-              });
-          }
-        
-          //This is for popup alert and for title bar flashy text
-          //We want this after the sound finishes, because otherwise 
-          //the sound will be paused until this alert is clicked away.
-          if((!stopAlerts) && $('#chkPopup').is(':checked')){
-              //Stop more alerts
-              startAlerts(false);
-              var oldTitle = document.title;
-              var msg = "New Message!";
-              var timeoutId;
-              var blink = function() { document.title = document.title == msg ? ' ' : msg; };
-              var clear = function() {
-                  clearInterval(timeoutId);
-                  document.title = oldTitle;
-                  window.onmousemove = null;
-                  timeoutId = null;
-              };
-              
-              if (!timeoutId) {
-                  timeoutId = setInterval(blink, 1000);
-                  window.onmousemove = clear;
-              }
-              if ($('#chkPopup').is(':checked'))
-                  alert(msg);
-          }
-      }
-  }
-  
-  function postOldMsgs(msgs){
-    for(var msgsIndex = msgs.length - 1; msgsIndex >= 0; msgsIndex--){
-      postMsg(msgs[msgsIndex]);
+    if(!winFocus){
+        //This is for sound alert
+        if ($('#chkSound').is(':checked')){
+            var audio = new Audio('sounds/notif.wav');
+            audio.play();
+            //When audio is done, show alert alert
+            audio.addEventListener("ended", function(){
+                audio.currentTime = 0;
+            });
+        }
+      
+        //This is for popup alert and for title bar flashy text
+        //We want this after the sound finishes, because otherwise 
+        //the sound will be paused until this alert is clicked away.
+        if((!stopAlerts) && $('#chkPopup').is(':checked')){
+            //Stop more alerts
+            startAlerts(false);
+            var oldTitle = document.title;
+            var msg = "New Message!";
+            var timeoutId;
+            var blink = function() { document.title = document.title == msg ? ' ' : msg; };
+            var clear = function() {
+                clearInterval(timeoutId);
+                document.title = oldTitle;
+                window.onmousemove = null;
+                timeoutId = null;
+            };
+            
+            if (!timeoutId) {
+                timeoutId = setInterval(blink, 1000);
+                window.onmousemove = clear;
+            }
+            if ($('#chkPopup').is(':checked'))
+                alert(msg);
+        }
     }
   }
   
-  function postMsg(aMsg){
+  function postOldMsgs(msgs){
+    //Using object so that it can be passed by reference
+    var loaded  = 0;
+    
+    for(var msgsIndex = msgs.length - 1; msgsIndex >= 0; msgsIndex--){
+      postMsg(msgs[msgsIndex], function(msgElm){
+        if (++loaded === msgs.length){
+          $('#divChat li').show();
+          var div = $('#divChat');
+          div.scrollTop(div[0].scrollHeight);
+        }else
+          msgElm.hide();
+      });
+    }
+  }
+  
+  function postMsg(aMsg, callback){
     var liMsg=$('#liMsg_'+aMsg.id);
     //If the msg li element does not exist, create it
     if(!liMsg.length){
       //Creating an li and adding timestamp, id, and formatted msg
       //Making a list object with HTML safe text
       liMsg = $('<li '
-               + 'id="liMsg_'+aMsg.id+'" '
-               + 'title="' + formatTime(new Date()) + '">').text(aMsg.msg);
+              + 'id="liMsg_'+aMsg.id+'" '
+              + 'title="' + formatTime(new Date()) + '">');
       //Hiding the message, until it is finished formatting.
       liMsg.hide();
+      //Put/Move the li element on/to the end
+      $('#messages').append(liMsg);
                
       //Converting back to text
-      var msgText = liMsg[0].innerHTML;
+      var msgText = sanitize(aMsg.msg);
     
       //Adding links/images. When that's done, display it
       formatMessage(msgText, function(msg){
-        //Clear the text from the list element, then add the formatted
-        //text to the list element
-        liMsg.text('');
-        liMsg.append(msg);
-        liMsg.show();
-        
-        var div = $('#divChat');
-        div.scrollTop(div[0].scrollHeight);
+        formatUserTag(aMsg.user, function(userTag){
+          liMsg.append(userTag+' -> '+msg);
+          liMsg.show();
+          
+          var div = $('#divChat');
+          div.scrollTop(div[0].scrollHeight);
+          
+          if(callback) callback(liMsg);
+        });
       });
     }
-    //Put/Move the li element on/to the end
-    $('#messages').append(liMsg);
+  }
+
+  function formatUserTag(user,callback){
+    var safeUsername = sanitize(user.name);
+    //Note that we need all the else clauses because isUrlAnImage is Async
+    if(user.img){
+      var escapedLinks = sanitize(user.img);
+      var links = escapedLinks.match(linkRegEx);
+      //A user should only have one link in there
+      if(links && links.length == 1){
+        var link = links[0];
+        isUrlAnImage(link, function(isValid){
+          if(isValid){
+            var userTag = getUserImgTag(user);
+            callback(userTag);
+          }else{
+            callback(safeUsername);
+          }
+        });
+      }else{
+        callback(safeUsername);
+      }
+    }else{
+      callback(safeUsername);
+    }
   }
   
+  function getUserImgTag(user){
+    var iconTag = "";
+    if(user.img){
+      var safeName = sanitize(user.name);
+      var safeLink = sanitize(user.img);
+      iconTag =  '<img class="icon" '
+                    + 'title="'+safeName+'" '
+                    + 'src="'+safeLink+'" '
+                    + 'alt="'+safeName+'" />';
+    }else{
+      iconTag = '<img class="icon" />';
+    }
+    return iconTag;
+  }
+  
+  function updateUserData(user){
+    socket.emit('update user data', user);
+  }
+  
+  $('#ulOptions li label').hover(function(){
+    $(this).addClass('label_hover');
+  },function(){
+    $(this).removeClass('label_hover');
+  });
+  
+  $('#imgPlusSign').hover(function(){
+    $(this).removeClass('see_through');
+    $('#imgIconPreview').addClass('see_through');
+  },function(){
+    $(this).addClass('see_through');
+    $('#imgIconPreview').removeClass('see_through');
+  });
+  
+  $('#txtAddIconURL').on('input', function(){
+    imgUrl = $('#txtAddIconURL').val();
+    var escapedLinks = sanitize(imgUrl);
+    var links = escapedLinks.match(linkRegEx);
+    //A user should only have one link in there
+    if(links && links.length == 1){
+      isUrlAnImage(links[0], function(isValid){
+        if(isValid){
+          $('#imgIconPreview').attr("src", links[0]);
+        }
+        else
+          $('#imgIconPreview').attr("src", '');
+      });
+    }
+  });
+
   $('#frmUserName').submit(function(){
     userData = {};
-    userData.userName = $('#txtUserName').val();
+    userData.name = $('#txtUserName').val();
     
     socket.emit('user connect', userData);
     return false;
@@ -186,7 +303,7 @@ $(document).ready(function() {
   $('#frmChatSend').submit(function(){
     var msg = $('#txtMsg').val();
     
-    if(!(userData.userName && userData.uid)){
+    if(!(userData.name)){
       alert('You need to connect with a username first.');
     }else if(msg !== ''){
       var msg;
@@ -199,9 +316,21 @@ $(document).ready(function() {
     return false;
   });
   
+  $('#txtAddIconURL').on('keydown', function (e) {
+    if (e.which == 13) {
+      userData.img = $('#txtAddIconURL').val();
+      updateUserData(userData);
+      $("#btnOptions").dropdown("toggle");
+    }
+  });
+  
+  $('#imgPlusSign').click(function(){
+    userData.img = $('#txtAddIconURL').val();
+    updateUserData(userData);
+  });
+  
   socket.on('server connection', function(data){
     pl('connected with server');
-    userData.uid = data.uid;
     postOldMsgs(data.oldMsgs);
     $('#divOverlay').hide();
     $('#txtMsg').focus();
@@ -209,44 +338,55 @@ $(document).ready(function() {
   
   socket.on('reconnect', function(){
     pl('reconnected with server');
-    if(userData.userName && userData.uid)
+    if(userData.name)
       socket.emit('user connect', userData);
   });
   
   socket.on('chat message', function(msg){
-      postMsg(msg);
-      doAlert();
+    postMsg(msg);
+    doAlert();
   });
   
-  socket.on('user list update', function(userNameList){
-    var listOfIds = [];
+  function updateUserImg(user){
+    var safeName = sanitize(user.name);
+    var safeLink = sanitize(user.img);
     
-    var newList = [];
-    //Append 'liUserNameID' to the front of all of them, so that
-    //a user can't make a username that is the id of another element
-    userNameList.forEach(function(index){
-      newList.push('liUserNameID' + index);
-    });
-
-    //If the current user list has a name that isn't in the new 
-    //list, remove it
-    $('#userList').each(function(){
-        $(this).find('li').each(function(){
-            var currId = $(this).attr('id');
-            listOfIds.push(currId);
-            if(newList.indexOf(currId) === -1) $(this).remove();
-        });
-    });
-
-    //If a new user has been added to the list, add them
-    newList.forEach(function(id) {
-      if(listOfIds.indexOf(id) === -1){
-          var newLi = $('<li>').text(id.substring(12));
-          newLi.attr('id', id);
-          $('#userList').append(newLi);
-      }
+    var iconElm = $('#imgUserListIcon_'+safeName);
+    if(iconElm) iconElm.attr('src', safeLink);
+  }
+  
+  socket.on('user list update', function(serverUserList){
+    var newUserList = serverUserList.slice();
+    
+    //Remove any user that isn't in the new list
+    userList.forEach(function(user){
+      var found = false;
+      newUserList.forEach(function(newUser){
+        if(user.name == newUser.name){
+          found = true;
+          //Now check if the the user icon need to be updated
+          if(user.img !== newUser.img) updateUserImg(newUser);
+          
+          //If the user was found, that means that it is a old user
+          //and does not have to be added to the user list
+          removeUserName(newUserList, user.name, function(newSet){ newUserList = newSet });
+        }
+      });
+      if(!found) $('#liUserNameID_' + user.name).remove();
     });
     
+    newUserList.forEach(function(newUser){
+      var safeName = sanitize(newUser.name);
+      var userLi = $('<li id="'+'liUserNameID_'+safeName+'">');
+      var userImgElm = $(getUserImgTag(newUser));
+      userImgElm.attr('id', 'imgUserListIcon_'+safeName);
+      
+      userLi.append(userImgElm);
+      userLi.append(' ' + newUser.name);
+      $('#userList').append(userLi);
+    });
+    
+    userList = serverUserList.slice();
   });
   
   socket.on('bad user name', function(reason){
@@ -256,9 +396,6 @@ $(document).ready(function() {
         break;
       case 'duplicate':
         alert('User Name Unavailable, Use Another.');
-        break;
-      case 'username uid mismatch':
-        alert('That should not have happened...');
         break;
       default:
         alert('An Error Occured When Adding That Username.\nTry Again');
