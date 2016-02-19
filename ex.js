@@ -40,6 +40,13 @@ app.get('/:resource_type/:resource', function (req, res) {
 
 
 var userList = [];
+var userIdSeq = {
+  currVal : 0,
+  nextVal : function(){
+    this.currVal++;
+    return this.currVal;
+  }
+};
 var banList = [];
 var specMsgRegEx = /\/([^\:\/][^\/\s]*)/g;//////TODO:HANDLE SPACES USING QUOTES
 
@@ -75,7 +82,7 @@ function getUserNameList(set){
 
 function getUserData(set){
   var userData = [];
-  var clientSafeData = [ 'name', 'img' ];
+  var clientSafeData = [ 'id', 'name', 'img' ];
   
   set.forEach(function(user){
     var userObj = {};
@@ -215,6 +222,7 @@ io.on('connection', function(socket){
   log('connection established');
   
   socket.on('user connect', function(user){
+    user.id = userIdSeq.nextVal();
     addUser(user, function(updUserRes){
       if(updUserRes.failed){
         socket.emit('bad user name', updUserRes.reason);
