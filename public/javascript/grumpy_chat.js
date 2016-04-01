@@ -48,10 +48,10 @@ function compareObjects(obj1, obj2){
   return returnVal;
 }
 
-function removeUserName(set, name, callback){
+function removeUser(set, user, callback){
   set = set.filter(
     function(entry){
-      return entry.name !== name;
+      return entry.id !== user.id;
     });
   callback(set);
 }
@@ -348,10 +348,9 @@ $(document).ready(function() {
   });
   
   function updateUserImg(user){
-    var safeName = sanitize(user.name);
     var safeLink = sanitize(user.img);
     
-    var iconElm = $('#imgUserListIcon_'+safeName);
+    var iconElm = $('#imgUserListIcon_'+user.id);
     if(iconElm) iconElm.attr('src', safeLink);
   }
   
@@ -362,24 +361,23 @@ $(document).ready(function() {
     userList.forEach(function(user){
       var found = false;
       newUserList.forEach(function(newUser){
-        if(user.name == newUser.name){
+        if(user.id == newUser.id){
           found = true;
           //Now check if the the user icon need to be updated
           if(user.img !== newUser.img) updateUserImg(newUser);
           
           //If the user was found, that means that it is a old user
           //and does not have to be added to the user list
-          removeUserName(newUserList, user.name, function(newSet){ newUserList = newSet });
+          removeUser(newUserList, user, function(newSet){ newUserList = newSet });
         }
       });
-      if(!found) $('#liUserNameID_' + user.name).remove();
+      if(!found) $('#liUserID_' + user.id).remove();
     });
     
     newUserList.forEach(function(newUser){
-      var safeName = sanitize(newUser.name);
-      var userLi = $('<li id="'+'liUserNameID_'+safeName+'">');
+      var userLi = $('<li id="'+'liUserID_'+newUser.id+'">');
       var userImgElm = $(getUserImgTag(newUser));
-      userImgElm.attr('id', 'imgUserListIcon_'+safeName);
+      userImgElm.attr('id', 'imgUserListIcon_'+newUser.id);
       
       userLi.append(userImgElm);
       userLi.append(' ' + newUser.name);
