@@ -343,8 +343,9 @@ $(document).ready(function() {
   });
   
   socket.on('chat message', function(msg){
-    postMsg(msg);
-    doAlert();
+    postMsg(msg, function(){
+      doAlert(); 
+    });
   });
   
   function updateUserImg(user){
