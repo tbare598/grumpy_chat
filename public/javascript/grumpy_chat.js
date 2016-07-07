@@ -210,7 +210,9 @@ $(document).ready(function() {
           liMsg.show();
           
           var div = $('#divChat');
-          div.scrollTop(div[0].scrollHeight);
+          if(div[0].scrollHeight - div[0].scrollTop < 336){
+              div.scrollTop(div[0].scrollHeight);
+          }
           
           if(callback) callback(liMsg);
         });
