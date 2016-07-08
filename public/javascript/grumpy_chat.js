@@ -210,7 +210,9 @@ $(document).ready(function() {
           liMsg.show();
           
           var div = $('#divChat');
-          if(div[0].scrollHeight - div[0].scrollTop < 336){
+          var distToBtm = (div[0].scrollHeight - div[0].scrollTop) - window.innerHeight + 13;
+          //within 100px, it will autoscroll
+          if(distToBtm < 100){
               div.scrollTop(div[0].scrollHeight);
           }
           
